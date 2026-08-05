@@ -93,10 +93,17 @@ def _run_audit(job_id: str, urls: list, site_label: str, site_type: str, workers
                     url = future_map[fut]
                     res = {"url": url, "error": str(e),
                            "category_scores": {}, "overall_score": 0, "issues": []}
+                # Drop large HTML text after scoring — not needed for the report
+                # and saves significant RAM on Render's free 512 MB tier.
+                res.pop("main_text", None)
                 results.append(res)
                 completed += 1
                 with jobs_lock:
                     jobs[job_id]["progress"] = completed
+
+        # Signal step 3 — building the Excel report
+        with jobs_lock:
+            jobs[job_id]["status"] = "building_report"
 
         report = build_site_report(results)
         xlsx_path = os.path.join(UPLOAD_FOLDER, f"{job_id}.xlsx")
