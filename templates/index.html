@@ -1,0 +1,814 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Content Audit Tool — AI-Powered SEO & Content Health Analysis</title>
+  <meta name="description" content="Audit your entire website's content quality and SEO health. Upload a sitemap URL or CSV of page URLs to get a full Excel report." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet" />
+  <style>
+    /* ── Design tokens ─────────────────────────────────────────── */
+    :root {
+      --bg:          #0A0D14;
+      --surface:     #111520;
+      --card:        #161B2E;
+      --card-hover:  #1C2340;
+      --border:      rgba(255,255,255,0.07);
+      --border-mid:  rgba(255,255,255,0.12);
+      --ink:         #E8EBF4;
+      --ink-dim:     #7A8299;
+      --ink-muted:   #3E4561;
+      --accent:      #6366F1;
+      --accent-2:    #8B5CF6;
+      --accent-glow: rgba(99,102,241,0.25);
+      --green:       #10B981;
+      --green-bg:    rgba(16,185,129,0.12);
+      --amber:       #F59E0B;
+      --amber-bg:    rgba(245,158,11,0.12);
+      --red:         #EF4444;
+      --red-bg:      rgba(239,68,68,0.12);
+      --tab-active:  #6366F1;
+      --radius:      14px;
+      --radius-sm:   8px;
+    }
+
+    /* ── Reset & base ──────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; }
+    body {
+      background: var(--bg);
+      color: var(--ink);
+      font-family: 'Inter', system-ui, sans-serif;
+      font-size: 15px;
+      line-height: 1.6;
+      min-height: 100vh;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* ── Background decoration ──────────────────────────────────── */
+    .bg-orbs {
+      position: fixed; inset: 0; pointer-events: none; z-index: 0; overflow: hidden;
+    }
+    .bg-orbs::before {
+      content: '';
+      position: absolute; top: -200px; left: -100px;
+      width: 700px; height: 700px; border-radius: 50%;
+      background: radial-gradient(circle, rgba(99,102,241,0.12) 0%, transparent 70%);
+    }
+    .bg-orbs::after {
+      content: '';
+      position: absolute; bottom: -200px; right: -100px;
+      width: 600px; height: 600px; border-radius: 50%;
+      background: radial-gradient(circle, rgba(139,92,246,0.10) 0%, transparent 70%);
+    }
+
+    /* ── Layout wrapper ─────────────────────────────────────────── */
+    .wrap {
+      position: relative; z-index: 1;
+      max-width: 860px;
+      margin: 0 auto;
+      padding: 60px 24px 100px;
+    }
+
+    /* ── Header ─────────────────────────────────────────────────── */
+    .header {
+      text-align: center;
+      margin-bottom: 52px;
+    }
+    .header .badge {
+      display: inline-flex; align-items: center; gap: 7px;
+      background: var(--accent-glow); border: 1px solid rgba(99,102,241,0.35);
+      color: #A5B4FC; font-size: 11.5px; font-weight: 600; letter-spacing: 0.08em;
+      text-transform: uppercase; padding: 5px 14px; border-radius: 99px;
+      margin-bottom: 20px;
+    }
+    .header .badge svg { width: 13px; height: 13px; opacity: 0.85; }
+    .header h1 {
+      font-family: 'Outfit', sans-serif;
+      font-size: clamp(32px, 5vw, 52px);
+      font-weight: 800;
+      line-height: 1.15;
+      letter-spacing: -0.02em;
+      background: linear-gradient(135deg, #E8EBF4 0%, #A5B4FC 50%, #C4B5FD 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      margin-bottom: 16px;
+    }
+    .header p {
+      color: var(--ink-dim); font-size: 16px; max-width: 560px; margin: 0 auto;
+    }
+
+    /* ── Card ───────────────────────────────────────────────────── */
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 32px;
+      backdrop-filter: blur(12px);
+    }
+
+    /* ── Tabs ───────────────────────────────────────────────────── */
+    .tabs {
+      display: flex; gap: 4px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 4px;
+      margin-bottom: 28px;
+    }
+    .tab-btn {
+      flex: 1; display: flex; align-items: center; justify-content: center; gap: 8px;
+      padding: 11px 20px;
+      border: none; border-radius: 6px;
+      background: transparent; color: var(--ink-dim);
+      font-family: 'Inter', sans-serif; font-size: 14px; font-weight: 500;
+      cursor: pointer; transition: all 0.2s ease;
+    }
+    .tab-btn svg { width: 16px; height: 16px; flex-shrink: 0; }
+    .tab-btn:hover { color: var(--ink); background: rgba(255,255,255,0.04); }
+    .tab-btn.active {
+      background: var(--accent); color: #fff;
+      box-shadow: 0 2px 12px rgba(99,102,241,0.4);
+    }
+
+    /* ── Tab panels ─────────────────────────────────────────────── */
+    .tab-panel { display: none; }
+    .tab-panel.active { display: block; }
+
+    /* ── Form elements ──────────────────────────────────────────── */
+    .field { margin-bottom: 20px; }
+    label {
+      display: block; font-size: 13px; font-weight: 600;
+      color: var(--ink-dim); letter-spacing: 0.03em;
+      margin-bottom: 7px;
+    }
+    label span.req { color: var(--accent); margin-left: 2px; }
+    input[type="text"],
+    input[type="url"],
+    input[type="number"],
+    select {
+      width: 100%; padding: 12px 16px;
+      background: var(--surface); color: var(--ink);
+      border: 1px solid var(--border-mid); border-radius: var(--radius-sm);
+      font-family: 'Inter', sans-serif; font-size: 14px;
+      transition: border-color 0.2s, box-shadow 0.2s;
+      outline: none; appearance: none;
+    }
+    input[type="text"]:focus,
+    input[type="url"]:focus,
+    input[type="number"]:focus,
+    select:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px var(--accent-glow);
+    }
+    input::placeholder { color: var(--ink-muted); }
+
+    /* ── File drop zone ─────────────────────────────────────────── */
+    .drop-zone {
+      border: 2px dashed var(--border-mid); border-radius: var(--radius-sm);
+      padding: 40px 24px; text-align: center;
+      cursor: pointer; transition: all 0.2s ease;
+      background: var(--surface); position: relative;
+    }
+    .drop-zone:hover, .drop-zone.drag-over {
+      border-color: var(--accent);
+      background: rgba(99,102,241,0.06);
+    }
+    .drop-zone input[type="file"] {
+      position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%;
+    }
+    .drop-zone .dz-icon { font-size: 36px; margin-bottom: 10px; }
+    .drop-zone .dz-text { color: var(--ink-dim); font-size: 14px; }
+    .drop-zone .dz-text strong { color: var(--accent); }
+    .drop-zone .dz-sub { font-size: 12px; color: var(--ink-muted); margin-top: 4px; }
+    .drop-zone .dz-chosen {
+      margin-top: 12px; padding: 8px 14px;
+      background: var(--green-bg); border: 1px solid rgba(16,185,129,0.25);
+      border-radius: 6px; color: var(--green); font-size: 13px; font-weight: 500;
+      display: none;
+    }
+    .drop-zone .dz-chosen.visible { display: inline-block; }
+
+    /* ── Advanced options grid ──────────────────────────────────── */
+    .adv-toggle {
+      display: flex; align-items: center; gap: 8px;
+      color: var(--ink-dim); font-size: 13px; font-weight: 500;
+      cursor: pointer; user-select: none; margin-bottom: 16px;
+      background: none; border: none;
+    }
+    .adv-toggle svg { width: 14px; height: 14px; transition: transform 0.2s; }
+    .adv-toggle.open svg { transform: rotate(90deg); }
+    .adv-grid {
+      display: grid; grid-template-columns: 1fr 1fr 1fr;
+      gap: 14px; margin-bottom: 20px;
+    }
+    @media (max-width: 600px) { .adv-grid { grid-template-columns: 1fr 1fr; } }
+
+    /* ── Submit button ──────────────────────────────────────────── */
+    .btn-run {
+      width: 100%; padding: 15px 24px;
+      background: linear-gradient(135deg, var(--accent) 0%, var(--accent-2) 100%);
+      color: #fff; border: none; border-radius: var(--radius-sm);
+      font-family: 'Outfit', sans-serif; font-size: 16px; font-weight: 700;
+      letter-spacing: 0.01em; cursor: pointer;
+      transition: all 0.2s ease;
+      box-shadow: 0 4px 20px rgba(99,102,241,0.35);
+      display: flex; align-items: center; justify-content: center; gap: 10px;
+    }
+    .btn-run:hover:not(:disabled) {
+      transform: translateY(-1px);
+      box-shadow: 0 6px 28px rgba(99,102,241,0.5);
+    }
+    .btn-run:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
+
+    /* ── Progress section ───────────────────────────────────────── */
+    #progress-section { display: none; margin-top: 32px; }
+    .progress-card {
+      background: var(--card); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 28px;
+    }
+    .progress-header {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 20px;
+    }
+    .progress-header .site-name {
+      font-family: 'Outfit', sans-serif; font-size: 18px; font-weight: 700; color: var(--ink);
+    }
+    .status-pill {
+      padding: 4px 12px; border-radius: 99px; font-size: 12px; font-weight: 600;
+    }
+    .status-pill.queued    { background: var(--amber-bg); color: var(--amber); }
+    .status-pill.running   { background: rgba(99,102,241,0.15); color: #A5B4FC; }
+    .status-pill.done      { background: var(--green-bg); color: var(--green); }
+    .status-pill.error     { background: var(--red-bg); color: var(--red); }
+
+    /* Progress bar */
+    .prog-track {
+      height: 8px; background: var(--surface); border-radius: 99px;
+      overflow: hidden; margin-bottom: 10px;
+    }
+    .prog-fill {
+      height: 100%; border-radius: 99px;
+      background: linear-gradient(90deg, var(--accent), var(--accent-2));
+      transition: width 0.4s ease;
+      position: relative;
+    }
+    .prog-fill::after {
+      content: '';
+      position: absolute; right: 0; top: 0; height: 100%; width: 40px;
+      background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3));
+      animation: shimmer 1.2s infinite;
+    }
+    @keyframes shimmer { 0%,100%{opacity:0.3} 50%{opacity:1} }
+    .prog-fill.done::after { display: none; }
+
+    .prog-stats {
+      display: flex; justify-content: space-between;
+      font-size: 13px; color: var(--ink-dim);
+    }
+    .prog-stats .count { font-weight: 600; color: var(--ink); }
+
+    /* Steps */
+    .steps {
+      display: flex; gap: 0; margin-top: 24px;
+    }
+    .step {
+      flex: 1; display: flex; flex-direction: column; align-items: center;
+      position: relative; font-size: 12px; color: var(--ink-muted);
+      text-align: center;
+    }
+    .step:not(:last-child)::after {
+      content: ''; position: absolute; top: 14px; left: 50%; width: 100%;
+      height: 2px; background: var(--border-mid);
+    }
+    .step.active:not(:last-child)::after,
+    .step.done:not(:last-child)::after { background: var(--accent); }
+    .step-dot {
+      width: 28px; height: 28px; border-radius: 50%;
+      border: 2px solid var(--border-mid);
+      background: var(--surface); display: flex; align-items: center; justify-content: center;
+      margin-bottom: 8px; position: relative; z-index: 1;
+      font-size: 12px; font-weight: 700; color: var(--ink-muted);
+      transition: all 0.3s ease;
+    }
+    .step.active .step-dot {
+      border-color: var(--accent); background: var(--accent-glow); color: var(--accent);
+      box-shadow: 0 0 0 4px var(--accent-glow);
+    }
+    .step.done .step-dot {
+      border-color: var(--green); background: var(--green-bg); color: var(--green);
+    }
+    .step.active .step-label { color: var(--ink); font-weight: 600; }
+    .step.done .step-label { color: var(--green); font-weight: 600; }
+
+    /* ── Result / download ──────────────────────────────────────── */
+    #result-section { display: none; margin-top: 20px; }
+    .result-card {
+      background: linear-gradient(135deg, rgba(16,185,129,0.08) 0%, rgba(99,102,241,0.08) 100%);
+      border: 1px solid rgba(16,185,129,0.25);
+      border-radius: var(--radius); padding: 28px;
+      text-align: center;
+    }
+    .result-score {
+      font-family: 'Outfit', sans-serif; font-size: 56px; font-weight: 800;
+      background: linear-gradient(135deg, var(--green) 0%, #34D399 100%);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+    }
+    .result-label { font-size: 13px; color: var(--ink-dim); margin-top: 4px; }
+    .result-meta { font-size: 14px; color: var(--ink-dim); margin: 16px 0; }
+    .btn-download {
+      display: inline-flex; align-items: center; gap: 10px;
+      padding: 14px 32px;
+      background: linear-gradient(135deg, var(--green) 0%, #059669 100%);
+      color: #fff; border: none; border-radius: var(--radius-sm);
+      font-family: 'Outfit', sans-serif; font-size: 16px; font-weight: 700;
+      cursor: pointer; text-decoration: none;
+      box-shadow: 0 4px 20px rgba(16,185,129,0.35);
+      transition: all 0.2s ease;
+    }
+    .btn-download:hover { transform: translateY(-2px); box-shadow: 0 6px 28px rgba(16,185,129,0.5); }
+    .btn-download svg { width: 18px; height: 18px; }
+
+    /* ── Error card ─────────────────────────────────────────────── */
+    .error-card {
+      background: var(--red-bg); border: 1px solid rgba(239,68,68,0.3);
+      border-radius: var(--radius-sm); padding: 16px 20px;
+      color: #FCA5A5; font-size: 14px; display: none; margin-top: 16px;
+    }
+    .error-card.visible { display: block; }
+
+    /* ── Features strip ─────────────────────────────────────────── */
+    .features {
+      display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px;
+      margin-top: 40px;
+    }
+    @media (max-width: 600px) { .features { grid-template-columns: 1fr; } }
+    .feat {
+      background: var(--card); border: 1px solid var(--border);
+      border-radius: var(--radius-sm); padding: 20px;
+    }
+    .feat-icon { font-size: 24px; margin-bottom: 10px; }
+    .feat h3 { font-size: 14px; font-weight: 600; margin-bottom: 5px; }
+    .feat p { font-size: 12.5px; color: var(--ink-dim); line-height: 1.5; }
+
+    /* ── Footer ─────────────────────────────────────────────────── */
+    footer {
+      text-align: center; margin-top: 60px; padding-top: 24px;
+      border-top: 1px solid var(--border); font-size: 12px; color: var(--ink-muted);
+    }
+
+    /* ── Spinner ─────────────────────────────────────────────────── */
+    .spinner {
+      width: 18px; height: 18px; border: 2px solid rgba(255,255,255,0.3);
+      border-top-color: #fff; border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Free tier notice ───────────────────────────────────────── */
+    .notice {
+      background: var(--amber-bg); border: 1px solid rgba(245,158,11,0.25);
+      border-radius: var(--radius-sm); padding: 12px 16px;
+      font-size: 12.5px; color: #FCD34D; margin-top: 20px; line-height: 1.5;
+    }
+    .notice strong { color: var(--amber); }
+
+    /* ── Divider ─────────────────────────────────────────────────── */
+    .divider {
+      height: 1px; background: var(--border); margin: 24px 0;
+    }
+  </style>
+</head>
+<body>
+<div class="bg-orbs"></div>
+<div class="wrap">
+
+  <!-- Header -->
+  <div class="header">
+    <div class="badge">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M9 12l2 2 4-4M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+      </svg>
+      AI Content Audit Platform
+    </div>
+    <h1>Content Health Audit</h1>
+    <p>Analyze your entire website's SEO &amp; content quality. Get a detailed Excel report in minutes — no setup required.</p>
+  </div>
+
+  <!-- Main form card -->
+  <div class="card" id="form-card">
+
+    <!-- Tabs -->
+    <div class="tabs" role="tablist">
+      <button class="tab-btn active" id="tab-sitemap" role="tab" onclick="switchTab('sitemap')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M9 20H5a2 2 0 01-2-2V6a2 2 0 012-2h4M15 20h4a2 2 0 002-2V6a2 2 0 00-2-2h-4M9 12h6M9 8h6M9 16h4"/>
+        </svg>
+        Sitemap URL
+      </button>
+      <button class="tab-btn" id="tab-csv" role="tab" onclick="switchTab('csv')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"/>
+        </svg>
+        CSV Upload
+      </button>
+    </div>
+
+    <!-- Sitemap panel -->
+    <div class="tab-panel active" id="panel-sitemap">
+      <div class="field">
+        <label for="sitemap_url">Sitemap URL <span class="req">*</span></label>
+        <input type="url" id="sitemap_url" name="sitemap_url"
+               placeholder="https://example.com/sitemap.xml"
+               autocomplete="off" spellcheck="false" />
+      </div>
+      <p style="font-size:12.5px; color:var(--ink-muted); margin-top:-10px; margin-bottom:20px;">
+        Accepts sitemap.xml or sitemap index files. All discovered child sitemaps are parsed automatically.
+      </p>
+    </div>
+
+    <!-- CSV panel -->
+    <div class="tab-panel" id="panel-csv">
+      <div class="field">
+        <label>Page URLs CSV <span class="req">*</span></label>
+        <div class="drop-zone" id="drop-zone">
+          <input type="file" id="csv_file" name="csv_file" accept=".csv,.txt" />
+          <div class="dz-icon">📄</div>
+          <div class="dz-text"><strong>Click to upload</strong> or drag &amp; drop</div>
+          <div class="dz-sub">CSV or plain text file — one URL per line or first column</div>
+          <div class="dz-chosen" id="dz-chosen"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="divider"></div>
+
+    <!-- Advanced options -->
+    <button class="adv-toggle" id="adv-toggle" onclick="toggleAdv()" type="button">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M9 18l6-6-6-6"/>
+      </svg>
+      Advanced Options
+    </button>
+    <div id="adv-options" style="display:none;">
+      <div class="adv-grid">
+        <div class="field" style="margin:0;">
+          <label for="site_type">Site Type</label>
+          <select id="site_type" name="site_type">
+            <option value="auto">Auto-detect</option>
+            <option value="service">Service / SaaS</option>
+            <option value="ecommerce">E-commerce</option>
+          </select>
+        </div>
+        <div class="field" style="margin:0;">
+          <label for="max_urls">Max URLs</label>
+          <input type="number" id="max_urls" name="max_urls" value="500" min="10" max="8000" />
+        </div>
+        <div class="field" style="margin:0;">
+          <label for="workers">Parallel Workers</label>
+          <input type="number" id="workers" name="workers" value="6" min="1" max="20" />
+        </div>
+      </div>
+    </div>
+
+    <!-- Run button -->
+    <button class="btn-run" id="btn-run" onclick="startAudit()">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+        <path d="M5 3l14 9-14 9V3z"/>
+      </svg>
+      Run Content Audit
+    </button>
+
+    <div class="notice">
+      <strong>⏱ Please be patient.</strong> Large audits (500+ pages) can take 10–20 minutes.
+      Keep this tab open — the job runs in the background and your Excel file will download automatically when done.
+    </div>
+  </div>
+
+  <!-- Error display -->
+  <div class="error-card" id="error-card"></div>
+
+  <!-- Progress section -->
+  <div id="progress-section">
+    <div class="progress-card">
+      <div class="progress-header">
+        <div class="site-name" id="prog-site"></div>
+        <div class="status-pill queued" id="status-pill">Queued</div>
+      </div>
+
+      <div class="prog-track">
+        <div class="prog-fill" id="prog-fill" style="width:0%"></div>
+      </div>
+      <div class="prog-stats">
+        <span id="prog-text">Initialising…</span>
+        <span class="count" id="prog-count">0 / 0</span>
+      </div>
+
+      <!-- Steps -->
+      <div class="steps" style="margin-top:24px;">
+        <div class="step active" id="step-discover">
+          <div class="step-dot">1</div>
+          <div class="step-label">Discover</div>
+        </div>
+        <div class="step" id="step-audit">
+          <div class="step-dot">2</div>
+          <div class="step-label">Audit Pages</div>
+        </div>
+        <div class="step" id="step-report">
+          <div class="step-dot">3</div>
+          <div class="step-label">Build Report</div>
+        </div>
+        <div class="step" id="step-done">
+          <div class="step-dot">✓</div>
+          <div class="step-label">Complete</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Result / download section -->
+  <div id="result-section">
+    <div class="result-card">
+      <div class="result-score" id="result-score">--</div>
+      <div class="result-label">Overall Content Health Score</div>
+      <div class="result-meta" id="result-meta"></div>
+      <a class="btn-download" id="btn-download" href="#" onclick="downloadFile(event)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+          <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/>
+        </svg>
+        Download Excel Report
+      </a>
+      <div style="margin-top:20px;">
+        <button onclick="resetForm()" style="background:none;border:none;color:var(--ink-dim);font-size:13px;cursor:pointer;text-decoration:underline;">
+          ← Run another audit
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Feature highlights -->
+  <div class="features">
+    <div class="feat">
+      <div class="feat-icon">📊</div>
+      <h3>5-Dimension Scoring</h3>
+      <p>Every page scored on Relevance, SEO, Quality, Usefulness &amp; Readability — each with transparent, auditable rules.</p>
+    </div>
+    <div class="feat">
+      <div class="feat-icon">🔍</div>
+      <h3>30+ Issue Checks</h3>
+      <p>Title tags, meta descriptions, H1s, schema markup, alt text, internal links, CTAs, and more — all validated from page source.</p>
+    </div>
+    <div class="feat">
+      <div class="feat-icon">📥</div>
+      <h3>Full Excel Report</h3>
+      <p>5-tab workbook: Summary, Content Inventory, Priority Pages, Recommendations, and Issues by Page.</p>
+    </div>
+  </div>
+
+  <footer>
+    AI Content Audit Platform — rule-based scoring, no paid APIs, no ML models.
+  </footer>
+</div>
+
+<script>
+  // ── State ──────────────────────────────────────────────────────
+  let currentJobId   = null;
+  let currentInputType = 'sitemap';
+  let pollInterval   = null;
+  let pollCount      = 0;
+
+  // ── Tab switching ──────────────────────────────────────────────
+  function switchTab(type) {
+    currentInputType = type;
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+    document.getElementById('tab-' + type).classList.add('active');
+    document.getElementById('panel-' + type).classList.add('active');
+    clearError();
+  }
+
+  // ── Advanced options toggle ────────────────────────────────────
+  function toggleAdv() {
+    const opts = document.getElementById('adv-options');
+    const btn  = document.getElementById('adv-toggle');
+    const open = opts.style.display === 'none';
+    opts.style.display = open ? 'block' : 'none';
+    btn.classList.toggle('open', open);
+  }
+
+  // ── File drop zone ─────────────────────────────────────────────
+  const dz = document.getElementById('drop-zone');
+  const fi = document.getElementById('csv_file');
+  dz.addEventListener('dragover',  e => { e.preventDefault(); dz.classList.add('drag-over'); });
+  dz.addEventListener('dragleave', () => dz.classList.remove('drag-over'));
+  dz.addEventListener('drop', e => {
+    e.preventDefault(); dz.classList.remove('drag-over');
+    const f = e.dataTransfer.files[0];
+    if (f) { showChosenFile(f.name); setFileInput(f); }
+  });
+  fi.addEventListener('change', () => {
+    if (fi.files[0]) showChosenFile(fi.files[0].name);
+  });
+  function showChosenFile(name) {
+    const el = document.getElementById('dz-chosen');
+    el.textContent = '✓ ' + name;
+    el.classList.add('visible');
+  }
+  function setFileInput(file) {
+    const dt = new DataTransfer();
+    dt.items.add(file);
+    fi.files = dt.files;
+  }
+
+  // ── Errors ─────────────────────────────────────────────────────
+  function showError(msg) {
+    const el = document.getElementById('error-card');
+    el.textContent = '⚠ ' + msg;
+    el.classList.add('visible');
+    el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }
+  function clearError() {
+    document.getElementById('error-card').classList.remove('visible');
+  }
+
+  // ── Start audit ────────────────────────────────────────────────
+  async function startAudit() {
+    clearError();
+    const btn = document.getElementById('btn-run');
+
+    // Validate
+    if (currentInputType === 'sitemap') {
+      const url = document.getElementById('sitemap_url').value.trim();
+      if (!url) { showError('Please enter a sitemap URL.'); return; }
+      if (!url.startsWith('http')) { showError('Please enter a full URL starting with http:// or https://'); return; }
+    } else {
+      if (!fi.files || !fi.files[0]) { showError('Please select a CSV file.'); return; }
+    }
+
+    // Build form data
+    const fd = new FormData();
+    fd.append('input_type', currentInputType);
+    fd.append('site_type',  document.getElementById('site_type').value);
+    fd.append('max_urls',   document.getElementById('max_urls').value);
+    fd.append('workers',    document.getElementById('workers').value);
+
+    if (currentInputType === 'sitemap') {
+      fd.append('sitemap_url', document.getElementById('sitemap_url').value.trim());
+    } else {
+      fd.append('csv_file', fi.files[0]);
+    }
+
+    // UI: disable button, show spinner
+    btn.disabled = true;
+    btn.innerHTML = '<div class="spinner"></div> Discovering URLs…';
+
+    let res, data;
+    try {
+      res  = await fetch('/run', { method: 'POST', body: fd });
+      data = await res.json();
+    } catch (e) {
+      showError('Network error — please try again.');
+      btn.disabled = false;
+      btn.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 3l14 9-14 9V3z"/></svg> Run Content Audit';
+      return;
+    }
+
+    if (!res.ok || data.error) {
+      showError(data.error || 'An unexpected error occurred.');
+      btn.disabled = false;
+      btn.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 3l14 9-14 9V3z"/></svg> Run Content Audit';
+      return;
+    }
+
+    // Job started — show progress
+    currentJobId = data.job_id;
+    document.getElementById('prog-site').textContent = data.site_label || 'Auditing…';
+    document.getElementById('prog-count').textContent = '0 / ' + data.total;
+    document.getElementById('prog-text').textContent = 'Starting audit…';
+    document.getElementById('progress-section').style.display = 'block';
+    document.getElementById('form-card').style.display = 'none';
+    document.getElementById('progress-section').scrollIntoView({ behavior: 'smooth' });
+
+    setStep(2);  // move to Audit step
+    startPolling();
+  }
+
+  // ── Polling ────────────────────────────────────────────────────
+  function startPolling() {
+    pollCount = 0;
+    pollInterval = setInterval(poll, 2500);
+  }
+  function stopPolling() {
+    if (pollInterval) { clearInterval(pollInterval); pollInterval = null; }
+  }
+
+  async function poll() {
+    if (!currentJobId) { stopPolling(); return; }
+    pollCount++;
+
+    let data;
+    try {
+      const res = await fetch('/status/' + currentJobId);
+      data = await res.json();
+    } catch (e) { return; }  // network blip — try again next tick
+
+    const { status, progress, total, error, site_label, overall_score, pages_analyzed } = data;
+
+    // Update pill
+    const pill = document.getElementById('status-pill');
+    pill.className = 'status-pill ' + status;
+    pill.textContent = { queued:'Queued', running:'Running', done:'Complete', error:'Error' }[status] || status;
+
+    // Update bar and counters
+    const pct = total > 0 ? Math.round((progress / total) * 100) : 0;
+    const fill = document.getElementById('prog-fill');
+    fill.style.width = pct + '%';
+
+    document.getElementById('prog-count').textContent = progress + ' / ' + total;
+
+    if (status === 'running') {
+      const rate = pollCount > 1 ? (progress / (pollCount * 2.5)).toFixed(1) : '—';
+      document.getElementById('prog-text').textContent =
+        `Auditing pages… (~${rate} pages/sec)`;
+      setStep(2);
+    } else if (status === 'queued') {
+      document.getElementById('prog-text').textContent = 'Queued — starting soon…';
+      setStep(1);
+    }
+
+    if (status === 'done') {
+      fill.classList.add('done');
+      fill.style.width = '100%';
+      document.getElementById('prog-text').textContent = 'Building Excel report…';
+      setStep(4);
+      stopPolling();
+      setTimeout(() => showResult(overall_score, pages_analyzed, site_label), 800);
+    }
+
+    if (status === 'error') {
+      stopPolling();
+      document.getElementById('prog-text').textContent = 'Audit failed: ' + (error || 'Unknown error');
+      document.getElementById('progress-section').style.display = 'none';
+      document.getElementById('form-card').style.display = 'block';
+      showError(error || 'Audit failed. Please try again.');
+      document.getElementById('btn-run').disabled = false;
+      document.getElementById('btn-run').innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 3l14 9-14 9V3z"/></svg> Run Content Audit';
+    }
+  }
+
+  // ── Steps ──────────────────────────────────────────────────────
+  function setStep(n) {
+    const ids = ['step-discover','step-audit','step-report','step-done'];
+    ids.forEach((id, i) => {
+      const el = document.getElementById(id);
+      const stepN = i + 1;
+      el.classList.toggle('done',   stepN < n);
+      el.classList.toggle('active', stepN === n);
+    });
+  }
+
+  // ── Show result ────────────────────────────────────────────────
+  function showResult(score, pages, siteLabel) {
+    document.getElementById('result-score').textContent = score ?? '--';
+    document.getElementById('result-meta').textContent =
+      `${pages ?? '?'} pages analyzed for ${siteLabel || 'your site'}`;
+    document.getElementById('result-section').style.display = 'block';
+    document.getElementById('result-section').scrollIntoView({ behavior: 'smooth' });
+  }
+
+  // ── Download ───────────────────────────────────────────────────
+  function downloadFile(e) {
+    e.preventDefault();
+    if (currentJobId) {
+      window.location.href = '/download/' + currentJobId;
+    }
+  }
+
+  // ── Reset ──────────────────────────────────────────────────────
+  function resetForm() {
+    stopPolling();
+    currentJobId = null;
+    pollCount = 0;
+
+    document.getElementById('form-card').style.display = 'block';
+    document.getElementById('progress-section').style.display = 'none';
+    document.getElementById('result-section').style.display = 'none';
+    clearError();
+
+    const fill = document.getElementById('prog-fill');
+    fill.style.width = '0%';
+    fill.classList.remove('done');
+
+    document.getElementById('btn-run').disabled = false;
+    document.getElementById('btn-run').innerHTML =
+      '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 3l14 9-14 9V3z"/></svg> Run Content Audit';
+
+    setStep(1);
+    document.getElementById('form-card').scrollIntoView({ behavior: 'smooth' });
+  }
+</script>
+</body>
+</html>

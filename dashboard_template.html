@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Content Health Report — __SITE_LABEL__</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  :root{
+    --bg:#F4F6F8; --panel:#FFFFFF; --ink:#141A21; --ink-dim:#5B6673;
+    --line:#E1E6EB;
+    --good:#0E7C6B; --good-bg:#E4F5F1;
+    --mid:#B8720A;  --mid-bg:#FBEEDB;
+    --bad:#B23A2E;  --bad-bg:#FBE9E7;
+    --accent:#2A4B7C;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0; background:var(--bg); color:var(--ink);
+    font-family:'Segoe UI', Inter, system-ui, sans-serif; -webkit-font-smoothing:antialiased;}
+  h1,h2,h3{font-family:'Georgia', 'Times New Roman', serif; font-weight:700; letter-spacing:-0.01em; margin:0;}
+  .wrap{max-width:1180px; margin:0 auto; padding:32px 24px 80px;}
+  header.top{display:flex; justify-content:space-between; align-items:flex-end; border-bottom:2px solid var(--ink); padding-bottom:16px; margin-bottom:28px; flex-wrap:wrap; gap:12px;}
+  header.top .eyebrow{text-transform:uppercase; letter-spacing:0.12em; font-size:11px; color:var(--ink-dim); margin-bottom:4px;}
+  header.top h1{font-size:28px;}
+  header.top .meta{font-size:12px; color:var(--ink-dim); text-align:right;}
+  .grid{display:grid; gap:16px;}
+  .cols-5{grid-template-columns:repeat(5,1fr);}
+  .cols-4{grid-template-columns:repeat(4,1fr);}
+  .cols-2{grid-template-columns:1.3fr 1fr;}
+  @media(max-width:900px){.cols-5,.cols-4,.cols-2{grid-template-columns:1fr 1fr;}}
+  .panel{background:var(--panel); border:1px solid var(--line); border-radius:6px; padding:18px 20px;}
+  .score-hero{display:flex; align-items:center; gap:28px; padding:24px 28px;}
+  .score-ring{position:relative; width:132px; height:132px; flex:none;}
+  .score-ring .num{position:absolute; inset:0; display:flex; align-items:center; justify-content:center; flex-direction:column;}
+  .score-ring .num span.val{font-family:Georgia,serif; font-size:34px; font-weight:700;}
+  .score-ring .num span.lbl{font-size:10px; text-transform:uppercase; letter-spacing:0.08em; color:var(--ink-dim);}
+  .score-hero .desc{font-size:13px; color:var(--ink-dim); line-height:1.5;}
+  .score-hero .desc b{color:var(--ink);}
+  .cat-card{padding:16px 18px;}
+  .cat-card .lbl{font-size:11px; text-transform:uppercase; letter-spacing:0.08em; color:var(--ink-dim); margin-bottom:6px;}
+  .cat-card .val{font-family:Georgia,serif; font-size:26px; font-weight:700;}
+  .cat-card .weight{font-size:11px; color:var(--ink-dim);}
+  .bar-track{height:6px; background:var(--line); border-radius:3px; margin-top:8px; overflow:hidden;}
+  .bar-fill{height:100%; border-radius:3px;}
+  .metric{padding:14px 16px;}
+  .metric .val{font-family:Georgia,serif; font-size:22px; font-weight:700;}
+  .metric .lbl{font-size:11px; color:var(--ink-dim); text-transform:uppercase; letter-spacing:0.06em; margin-top:2px;}
+  section{margin-top:36px;}
+  section > h2{font-size:19px; margin-bottom:14px; display:flex; align-items:center; gap:10px;}
+  section > h2::after{content:''; flex:1; height:1px; background:var(--line);}
+  table{width:100%; border-collapse:collapse; font-size:13px;}
+  th{text-align:left; font-size:11px; text-transform:uppercase; letter-spacing:0.05em; color:var(--ink-dim); padding:8px 10px; border-bottom:2px solid var(--ink);}
+  td{padding:9px 10px; border-bottom:1px solid var(--line); vertical-align:top;}
+  tr:hover td{background:#FAFBFC;}
+  .pill{display:inline-block; padding:2px 9px; border-radius:99px; font-size:11px; font-weight:600;}
+  .pill.High{background:var(--bad-bg); color:var(--bad);}
+  .pill.Medium{background:var(--mid-bg); color:var(--mid);}
+  .pill.Low{background:var(--good-bg); color:var(--good);}
+  .url-cell{max-width:340px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+  .url-cell a{color:var(--accent); text-decoration:none;}
+  .score-badge{font-weight:700; font-family:Georgia,serif;}
+  .two-col{display:grid; grid-template-columns:1fr 1fr; gap:24px;}
+  @media(max-width:900px){.two-col{grid-template-columns:1fr;}}
+  .rec-row{display:flex; gap:14px; padding:12px 0; border-bottom:1px solid var(--line);}
+  .rec-row:last-child{border-bottom:none;}
+  .rec-row .title{font-weight:700; font-size:14px;}
+  .rec-row .desc{font-size:12.5px; color:var(--ink-dim); margin-top:2px;}
+  .rec-row .affected{font-size:11px; color:var(--ink-dim); margin-top:4px;}
+  canvas{max-width:100%;}
+  footer{margin-top:48px; padding-top:16px; border-top:1px solid var(--line); font-size:11px; color:var(--ink-dim); text-align:center;}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="top">
+    <div>
+      <div class="eyebrow">AI Content Audit Platform</div>
+      <h1>Content Health Report — __SITE_LABEL__</h1>
+    </div>
+    <div class="meta" id="meta"></div>
+  </header>
+
+  <div class="grid cols-2">
+    <div class="panel score-hero">
+      <div class="score-ring"><canvas id="heroRing" width="132" height="132"></canvas>
+        <div class="num"><span class="val" id="heroVal">--</span><span class="lbl">/ 100</span></div>
+      </div>
+      <div class="desc">
+        <div><b id="heroWord">--</b> content health score, weighted across Relevance, SEO, Quality, Usefulness, and Readability.</div>
+        <div style="margin-top:8px;"><span id="heroCount">--</span> articles analyzed.</div>
+      </div>
+    </div>
+    <div class="panel">
+      <canvas id="categoryChart" height="150"></canvas>
+    </div>
+  </div>
+
+  <div class="grid cols-5" id="catCards" style="margin-top:16px;"></div>
+
+  <section>
+    <h2>Website-Level Metrics</h2>
+    <div class="grid cols-4" id="metrics"></div>
+  </section>
+
+  <section>
+    <h2>Coverage</h2>
+    <div class="grid cols-4" id="coverage"></div>
+  </section>
+
+  <section>
+    <h2>Issue Distribution</h2>
+    <div class="two-col">
+      <div class="panel"><canvas id="issueChart"></canvas></div>
+      <div class="panel" id="issueList" style="max-height:360px; overflow:auto;"></div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Priority Recommendations</h2>
+    <div class="panel" id="recs"></div>
+  </section>
+
+  <section>
+    <h2>Pages Requiring Priority Updates</h2>
+    <div class="panel" style="padding:0;">
+      <table>
+        <thead><tr><th>Page</th><th>Score</th><th>Issues</th><th>Words</th></tr></thead>
+        <tbody id="priorityRows"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section>
+    <h2>Full Content Inventory</h2>
+    <div class="panel" style="padding:0;">
+      <table>
+        <thead><tr><th>Page</th><th>Score</th><th>Rel</th><th>SEO</th><th>Qual</th><th>Use</th><th>Read</th><th>Words</th><th>Issues</th></tr></thead>
+        <tbody id="inventoryRows"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <footer>Generated by the in-house AI Content Audit Platform — rule-based scoring, no paid APIs.</footer>
+</div>
+
+<script>
+const REPORT = __REPORT_JSON__;
+
+function scoreColor(v){
+  if(v>=75) return getComputedStyle(document.documentElement).getPropertyValue('--good').trim();
+  if(v>=50) return getComputedStyle(document.documentElement).getPropertyValue('--mid').trim();
+  return getComputedStyle(document.documentElement).getPropertyValue('--bad').trim();
+}
+function scoreWord(v){ if(v>=75) return 'Strong'; if(v>=50) return 'Needs Improvement'; return 'At Risk'; }
+function pill(sev){ return `<span class="pill ${sev}">${sev}</span>`; }
+
+if(REPORT.error){
+  document.querySelector('.wrap').innerHTML = `<h1>${REPORT.error}</h1>`;
+} else {
+
+document.getElementById('meta').innerHTML =
+  `Generated ${REPORT.generated_at}<br>${REPORT.successfully_analyzed}/${REPORT.total_articles} pages analyzed` +
+  (REPORT.failed_pages.length ? `<br>${REPORT.failed_pages.length} pages failed to fetch` : '');
+
+// Hero ring
+const overall = REPORT.overall_health_score;
+document.getElementById('heroVal').textContent = overall;
+document.getElementById('heroWord').textContent = scoreWord(overall);
+document.getElementById('heroCount').textContent = REPORT.successfully_analyzed;
+new Chart(document.getElementById('heroRing'), {
+  type:'doughnut',
+  data:{datasets:[{data:[overall,100-overall], backgroundColor:[scoreColor(overall), '#E1E6EB'], borderWidth:0}]},
+  options:{cutout:'78%', plugins:{legend:{display:false}, tooltip:{enabled:false}}, animation:false}
+});
+
+// Category cards
+const catLabels = {relevance:'Relevance', seo:'SEO', quality:'Quality', usefulness:'Usefulness', readability:'Readability'};
+const catWeights = {relevance:'25%', seo:'20%', quality:'20%', usefulness:'25%', readability:'10%'};
+let catHtml = '';
+for(const c in REPORT.category_scores){
+  const v = REPORT.category_scores[c];
+  catHtml += `<div class="panel cat-card">
+    <div class="lbl">${catLabels[c]} <span class="weight">(${catWeights[c]})</span></div>
+    <div class="val" style="color:${scoreColor(v)}">${v}</div>
+    <div class="bar-track"><div class="bar-fill" style="width:${v}%; background:${scoreColor(v)}"></div></div>
+  </div>`;
+}
+document.getElementById('catCards').innerHTML = catHtml;
+
+new Chart(document.getElementById('categoryChart'), {
+  type:'bar',
+  data:{labels: Object.keys(REPORT.category_scores).map(c=>catLabels[c]),
+    datasets:[{label:'Score', data:Object.values(REPORT.category_scores),
+      backgroundColor: Object.values(REPORT.category_scores).map(scoreColor)}]},
+  options:{scales:{y:{min:0,max:100}}, plugins:{legend:{display:false}, title:{display:true, text:'Category Scores (site average)'}}}
+});
+
+// Metrics
+const metrics = [
+  ['Total Articles', REPORT.total_articles],
+  ['Avg Word Count', REPORT.avg_word_count],
+  ['Avg Reading Time', REPORT.avg_reading_time_min + ' min'],
+  ['Avg Overall Score', REPORT.overall_health_score],
+];
+document.getElementById('metrics').innerHTML = metrics.map(([l,v])=>
+  `<div class="panel metric"><div class="val">${v}</div><div class="lbl">${l}</div></div>`).join('');
+
+// Coverage
+const coverage = [
+  ['FAQ Coverage', REPORT.faq_coverage_pct],
+  ['Schema Coverage', REPORT.schema_coverage_pct],
+  ['Internal Link Coverage', REPORT.internal_link_coverage_pct],
+  ['Author Coverage', REPORT.author_coverage_pct],
+];
+document.getElementById('coverage').innerHTML = coverage.map(([l,v])=>
+  `<div class="panel metric"><div class="val" style="color:${scoreColor(v)}">${v}%</div><div class="lbl">${l}</div></div>`).join('');
+
+// Issue distribution
+const issues = REPORT.issue_distribution;
+new Chart(document.getElementById('issueChart'), {
+  type:'bar',
+  data:{labels: issues.map(i=>i.label), datasets:[{label:'Pages affected', data:issues.map(i=>i.count),
+    backgroundColor: issues.map(i=>({High:'#B23A2E',Medium:'#B8720A',Low:'#0E7C6B'}[i.severity]))}]},
+  options:{indexAxis:'y', plugins:{legend:{display:false}, title:{display:true,text:'Pages affected per issue'}}}
+});
+document.getElementById('issueList').innerHTML = issues.map(i =>
+  `<div style="display:flex; justify-content:space-between; padding:8px 4px; border-bottom:1px solid var(--line); font-size:13px;">
+    <span>${pill(i.severity)} ${i.label}</span><span><b>${i.count}</b> pages</span></div>`).join('');
+
+// Recommendations
+document.getElementById('recs').innerHTML = REPORT.recommendations.map(r =>
+  `<div class="rec-row">
+    <div style="flex:none; padding-top:2px;">${pill(r.severity)}</div>
+    <div>
+      <div class="title">${r.title}</div>
+      <div class="desc">${r.description}</div>
+      <div class="affected">Affects ${r.affected_pages} pages (${r.affected_pct}% of site)</div>
+    </div>
+  </div>`).join('');
+
+// Priority pages
+document.getElementById('priorityRows').innerHTML = REPORT.top_priority_pages.map(p =>
+  `<tr><td class="url-cell"><a href="${p.url}" target="_blank">${p.title}</a></td>
+    <td class="score-badge" style="color:${scoreColor(p.overall_score)}">${p.overall_score}</td>
+    <td>${p.issue_count}</td><td>${p.word_count}</td></tr>`).join('');
+
+// Full inventory
+document.getElementById('inventoryRows').innerHTML = REPORT.content_inventory.map(p =>
+  `<tr><td class="url-cell"><a href="${p.url}" target="_blank">${p.title || p.url}</a></td>
+    <td class="score-badge" style="color:${scoreColor(p.overall_score)}">${p.overall_score}</td>
+    <td>${p.category_scores.relevance}</td><td>${p.category_scores.seo}</td>
+    <td>${p.category_scores.quality}</td><td>${p.category_scores.usefulness}</td>
+    <td>${p.category_scores.readability}</td><td>${p.word_count}</td><td>${p.issue_count}</td></tr>`).join('');
+}
+</script>
+</body>
+</html>
