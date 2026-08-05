@@ -10,10 +10,13 @@ Routes:
   GET  /status/<job_id>   — Poll job progress; returns JSON
   GET  /download/<job_id> — Stream the finished .xlsx to the browser
 
-All heavy work runs in a daemon thread so /run returns immediately.
-Job state lives in an in-memory dict (no DB / Redis needed).
-Files are written to /tmp and auto-cleaned after 2 hours.
+Deployment note:
+  Run with --workers 1 --threads 4 (NOT multiple workers).
+  Jobs are stored in an in-memory dict; threads share memory but
+  separate worker PROCESSES do NOT — causing 404s on status polling.
+  Single worker + multiple threads is the correct config for this app.
 """
+
 import os
 import uuid
 import threading
@@ -22,7 +25,6 @@ import concurrent.futures as cf
 from urllib.parse import urlparse
 
 from flask import Flask, request, jsonify, send_file, render_template
-from werkzeug.utils import secure_filename
 
 from crawler import urls_from_sitemap, urls_from_csv
 from extractor import extract_page
@@ -136,7 +138,7 @@ def run():
 
     input_type = request.form.get("input_type", "sitemap")
     site_type  = request.form.get("site_type", "auto")
-    max_urls   = min(int(request.form.get("max_urls", 500)), 8000)
+    max_urls   = min(int(request.form.get("max_urls", 200)), 8000)
     workers    = min(int(request.form.get("workers", DEFAULT_WORKERS)), 20)
 
     urls: list = []
