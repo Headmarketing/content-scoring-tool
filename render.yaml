@@ -1,9 +1,9 @@
 services:
   - type: web
-    name: content-audit-tool
+    name: content-scoring-tool
     runtime: python
     buildCommand: pip install -r requirements.txt
-    startCommand: gunicorn app:app --workers 2 --timeout 600 --bind 0.0.0.0:$PORT
+    startCommand: gunicorn app:app --workers 2 --timeout 600
     envVars:
       - key: PYTHON_VERSION
-        value: "3.11.0"
+        value: "3.11.7"
